@@ -127,16 +127,35 @@ PLOTLY_THEME = dict(
 )
 
 # ── Carga de datos ───────────────────────────────────────────────────────────
+import urllib.request
+import io
+
+def leer_csv_github(url, token=None, **kwargs):
+    """Lee un CSV desde GitHub con autenticación opcional."""
+    req = urllib.request.Request(url)
+    if token:
+        req.add_header("Authorization", f"token {token}")
+    with urllib.request.urlopen(req) as resp:
+        return pd.read_csv(io.StringIO(resp.read().decode("utf-8")), **kwargs)
+
 @st.cache_data(ttl=300)
 def cargar_datos():
-    """Lee desde GitHub (cloud) o carpeta local (PC) como fallback."""
+    """Lee desde GitHub con token (cloud) o carpeta local (PC) como fallback."""
+    # Intentar leer token desde Streamlit secrets
+    token = None
     try:
-        df_d = pd.read_csv(f"{BASE_URL}/registros_diarios.csv",
-                           decimal=",", parse_dates=["fecha"])
-        df_s = pd.read_csv(f"{BASE_URL}/resumen_semanal.csv",
-                           decimal=",")
-        df_i = pd.read_csv(f"{BASE_URL}/salidas_intermedias.csv",
-                           decimal=",")
+        token = st.secrets["GITHUB_TOKEN"]
+    except Exception:
+        pass
+
+    # Opción 1: GitHub (con o sin token)
+    try:
+        df_d = leer_csv_github(f"{BASE_URL}/registros_diarios.csv",
+                               token=token, decimal=",", parse_dates=["fecha"])
+        df_s = leer_csv_github(f"{BASE_URL}/resumen_semanal.csv",
+                               token=token, decimal=",")
+        df_i = leer_csv_github(f"{BASE_URL}/salidas_intermedias.csv",
+                               token=token, decimal=",")
         return df_d, df_s, df_i, None
     except Exception:
         # Fallback a carpeta local
