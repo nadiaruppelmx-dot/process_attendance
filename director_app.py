@@ -130,45 +130,50 @@ PLOTLY_THEME = dict(
 import urllib.request
 import io
 
-def leer_csv_github(url, token=None, **kwargs):
-    """Lee un CSV desde GitHub con autenticación opcional."""
+def leer_csv_github(archivo, token, **kwargs):
+    """Lee un CSV desde GitHub usando la API con autenticación."""
+    import json, base64
+    url = f"https://api.github.com/repos/{GITHUB_USER}/{REPO_NAME}/contents/data/processed/{archivo}?ref={BRANCH}"
     req = urllib.request.Request(url)
-    if token:
-        req.add_header("Authorization", f"token {token}")
+    req.add_header("Authorization", f"token {token}")
+    req.add_header("Accept", "application/vnd.github.v3+json")
     with urllib.request.urlopen(req) as resp:
-        return pd.read_csv(io.StringIO(resp.read().decode("utf-8")), **kwargs)
+        data = json.loads(resp.read())
+        contenido = base64.b64decode(data["content"]).decode("utf-8")
+        return pd.read_csv(io.StringIO(contenido), **kwargs)
 
 @st.cache_data(ttl=300)
 def cargar_datos():
-    """Lee desde GitHub con token (cloud) o carpeta local (PC) como fallback."""
-    # Intentar leer token desde Streamlit secrets
+    """Lee desde GitHub API (cloud) o carpeta local (PC) como fallback."""
     token = None
     try:
         token = st.secrets["GITHUB_TOKEN"]
     except Exception:
         pass
 
-    # Opción 1: GitHub (con o sin token)
-    try:
-        df_d = leer_csv_github(f"{BASE_URL}/registros_diarios.csv",
-                               token=token, decimal=",", parse_dates=["fecha"])
-        df_s = leer_csv_github(f"{BASE_URL}/resumen_semanal.csv",
-                               token=token, decimal=",")
-        df_i = leer_csv_github(f"{BASE_URL}/salidas_intermedias.csv",
-                               token=token, decimal=",")
-        return df_d, df_s, df_i, None
-    except Exception:
-        # Fallback a carpeta local
+    if token:
         try:
-            df_d = pd.read_csv(os.path.join(PROCESSED_DIR, "registros_diarios.csv"),
-                               decimal=",", parse_dates=["fecha"])
-            df_s = pd.read_csv(os.path.join(PROCESSED_DIR, "resumen_semanal.csv"),
-                               decimal=",")
-            df_i = pd.read_csv(os.path.join(PROCESSED_DIR, "salidas_intermedias.csv"),
-                               decimal=",")
+            df_d = leer_csv_github("registros_diarios.csv",
+                                   token=token, decimal=",", parse_dates=["fecha"])
+            df_s = leer_csv_github("resumen_semanal.csv",
+                                   token=token, decimal=",")
+            df_i = leer_csv_github("salidas_intermedias.csv",
+                                   token=token, decimal=",")
             return df_d, df_s, df_i, None
         except Exception as e:
-            return None, None, None, str(e)
+            return None, None, None, f"Error GitHub API: {e}"
+
+    # Fallback a carpeta local
+    try:
+        df_d = pd.read_csv(os.path.join(PROCESSED_DIR, "registros_diarios.csv"),
+                           decimal=",", parse_dates=["fecha"])
+        df_s = pd.read_csv(os.path.join(PROCESSED_DIR, "resumen_semanal.csv"),
+                           decimal=",")
+        df_i = pd.read_csv(os.path.join(PROCESSED_DIR, "salidas_intermedias.csv"),
+                           decimal=",")
+        return df_d, df_s, df_i, None
+    except Exception as e:
+        return None, None, None, str(e)
 
 df_diario, df_semanal, df_interm, error = cargar_datos()
 
