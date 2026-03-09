@@ -229,6 +229,9 @@ st.markdown(f"<span style='color:#8b8fa8;font-size:0.9rem'>Semana {semana_sel} �
 st.markdown("---")
 
 # ── KPIs ─────────────────────────────────────────────────────────────────────
+df_sem_fil["total_horas"]          = pd.to_numeric(df_sem_fil["total_horas"], errors="coerce")
+df_sem_fil["promedio_horas_turno"] = pd.to_numeric(df_sem_fil["promedio_horas_turno"], errors="coerce")
+df_sem_fil["turnos_registrados"]   = pd.to_numeric(df_sem_fil["turnos_registrados"], errors="coerce")
 total_horas    = df_sem_fil["total_horas"].sum()
 promedio_horas = df_sem_fil["promedio_horas_turno"].mean()
 total_turnos   = df_sem_fil["turnos_registrados"].sum()
