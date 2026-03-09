@@ -379,7 +379,7 @@ if not df_dia_fil.empty:
     if not df_interm.empty:
         df_interm_filt = df_interm[df_interm["empleado"].isin(emp_sel)].copy()
         if "semana" in df_interm_filt.columns:
-            df_interm_filt = df_interm_filt[df_interm_filt["semana"].isin(sem_sel)]
+            df_interm_filt = df_interm_filt[df_interm_filt["semana"] == semana_sel]
 
         def formatear_salidas(grupo):
             lineas = []
