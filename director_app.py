@@ -360,6 +360,73 @@ else:
     st.info("No hay turnos completos para mostrar en esta semana.")
 
 # ══════════════════════════════════════════════════════════════════════════════
+# TABLA — Detalle de jornada con salidas intermedias
+# ══════════════════════════════════════════════════════════════════════════════
+st.markdown('<p class="section-title">Detalle de jornada por empleado</p>', unsafe_allow_html=True)
+
+if not df_dia_fil.empty:
+    # Convertir columnas a numérico
+    df_dia_fil["horas_trabajadas"] = pd.to_numeric(df_dia_fil["horas_trabajadas"], errors="coerce")
+    df_dia_fil["horas_fuera"]      = pd.to_numeric(df_dia_fil["horas_fuera"], errors="coerce")
+
+    # Armar tabla base
+    df_det = df_dia_fil[["empleado", "fecha", "hora_entrada", "hora_salida",
+                          "horas_trabajadas", "horas_fuera"]].copy()
+    df_det["fecha"] = df_det["fecha"].astype(str).str[:10]
+    df_det["jornada_in_situ"] = (df_det["horas_trabajadas"] - df_det["horas_fuera"].fillna(0)).round(2)
+
+    # Agregar salidas intermedias como texto en la misma columna
+    if not df_interm.empty:
+        df_interm_filt = df_interm[df_interm["empleado"].isin(emp_sel)].copy()
+        if "semana" in df_interm_filt.columns:
+            df_interm_filt = df_interm_filt[df_interm_filt["semana"].isin(sem_sel)]
+
+        def formatear_salidas(grupo):
+            lineas = []
+            for _, row in grupo.iterrows():
+                salida  = str(row.get("hora_salida_intermedia", ""))[:5]
+                reingreso = str(row.get("hora_reentrada", ""))[:5]
+                minutos = row.get("minutos_fuera", "")
+                lineas.append(f"{salida} → {reingreso} ({minutos} min)")
+            return " | ".join(lineas)
+
+        df_sal_agrup = df_interm_filt.groupby(["empleado", "fecha"]).apply(
+            formatear_salidas
+        ).reset_index()
+        df_sal_agrup.columns = ["empleado", "fecha", "salidas_intermedias"]
+        df_sal_agrup["fecha"] = df_sal_agrup["fecha"].astype(str).str[:10]
+
+        df_det = df_det.merge(df_sal_agrup, on=["empleado", "fecha"], how="left")
+    else:
+        df_det["salidas_intermedias"] = "-"
+
+    df_det["salidas_intermedias"] = df_det["salidas_intermedias"].fillna("-")
+
+    # Renombrar columnas
+    df_det = df_det.rename(columns={
+        "empleado":           "Nombre",
+        "fecha":              "Fecha",
+        "hora_entrada":       "Hora entrada",
+        "hora_salida":        "Hora salida",
+        "salidas_intermedias":"Salidas intermedias",
+        "horas_fuera":        "Duración salida (h)",
+        "horas_trabajadas":   "Duración jornada (h)",
+        "jornada_in_situ":    "Jornada in situ (h)",
+    })
+
+    st.dataframe(
+        df_det.style.format({
+            "Duración salida (h)":   "{:.2f}",
+            "Duración jornada (h)":  "{:.2f}",
+            "Jornada in situ (h)":   "{:.2f}",
+        }, na_rep="-"),
+        use_container_width=True,
+        hide_index=True,
+    )
+else:
+    st.info("No hay datos de jornada para mostrar.")
+
+# ══════════════════════════════════════════════════════════════════════════════
 # GRÁFICO 3 — Evolución histórica semanal
 # ══════════════════════════════════════════════════════════════════════════════
 st.markdown('<p class="section-title">Evolución histórica de horas semanales</p>', unsafe_allow_html=True)
