@@ -401,10 +401,12 @@ if not df_sem_fil.empty:
         "total_horas_fuera":   "Horas fuera",
         "total_salidas_interm":"Salidas interm.",
     }
-    df_tabla = df_sem_fil[list(cols_mostrar.keys())].rename(columns=cols_mostrar)
+    df_tabla = df_sem_fil[list(cols_mostrar.keys())].rename(columns=cols_mostrar).copy()
+    for col in ["Horas totales", "Promedio/turno", "Horas fuera"]:
+        df_tabla[col] = pd.to_numeric(df_tabla[col], errors="coerce")
     st.dataframe(
         df_tabla.style
-            .format({"Horas totales": "{:.2f}", "Promedio/turno": "{:.2f}", "Horas fuera": "{:.2f}"})
+            .format({"Horas totales": "{:.2f}", "Promedio/turno": "{:.2f}", "Horas fuera": "{:.2f}"}, na_rep="-")
             .background_gradient(subset=["Horas totales"], cmap="Blues"),
         use_container_width=True,
         hide_index=True,
