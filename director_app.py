@@ -195,7 +195,7 @@ with st.sidebar:
     if not semana_sel:
         semana_sel = [semanas[0]] if semanas else []
 
-    empleados = sorted(df_semanal["empleado"].unique())
+    empleados = sorted(df_semanal[df_semanal["semana"].isin(semana_sel)]["empleado"].unique())
     emp_sel = st.multiselect(
         "👤 Empleados",
         options=empleados,
