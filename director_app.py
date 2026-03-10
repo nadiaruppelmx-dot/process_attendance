@@ -187,7 +187,13 @@ with st.sidebar:
         st.stop()
 
     semanas = sorted(df_semanal["semana"].unique(), reverse=True)
-    semana_sel = st.selectbox("📅 Semana", semanas)
+    semana_sel = st.multiselect(
+        "📅 Semanas",
+        options=semanas,
+        default=[semanas[0]] if semanas else [],
+    )
+    if not semana_sel:
+        semana_sel = [semanas[0]] if semanas else []
 
     empleados = sorted(df_semanal["empleado"].unique())
     emp_sel = st.multiselect(
@@ -207,24 +213,24 @@ with st.sidebar:
 
 # ── Filtrar datos ────────────────────────────────────────────────────────────
 df_sem_fil = df_semanal[
-    (df_semanal["semana"] == semana_sel) &
+    (df_semanal["semana"].isin(semana_sel)) &
     (df_semanal["empleado"].isin(emp_sel))
 ]
 df_dia_fil = df_diario[
-    (df_diario["semana"] == semana_sel) &
+    (df_diario["semana"].isin(semana_sel)) &
     (df_diario["empleado"].isin(emp_sel)) &
     (df_diario["sin_salida"] == 0) &
     (df_diario["sin_entrada"] == 0)
 ]
 df_alertas = df_diario[
-    (df_diario["semana"] == semana_sel) &
+    (df_diario["semana"].isin(semana_sel)) &
     (df_diario["empleado"].isin(emp_sel)) &
     ((df_diario["sin_salida"] == 1) | (df_diario["sin_entrada"] == 1))
 ]
 
 # ── Título ───────────────────────────────────────────────────────────────────
 st.markdown(f"# Reporte de Asistencia")
-st.markdown(f"<span style='color:#8b8fa8;font-size:0.9rem'>Semana {semana_sel} · {len(emp_sel)} empleado(s)</span>",
+st.markdown(f"<span style='color:#8b8fa8;font-size:0.9rem'>Semanas: {', '.join(str(s) for s in semana_sel)} · {len(emp_sel)} empleado(s)</span>",
             unsafe_allow_html=True)
 st.markdown("---")
 
@@ -379,7 +385,7 @@ if not df_dia_fil.empty:
     if not df_interm.empty:
         df_interm_filt = df_interm[df_interm["empleado"].isin(emp_sel)].copy()
         if "semana" in df_interm_filt.columns:
-            df_interm_filt = df_interm_filt[df_interm_filt["semana"] == semana_sel]
+            df_interm_filt = df_interm_filt[df_interm_filt["semana"].isin(semana_sel)]
 
         def formatear_salidas(grupo):
             lineas = []
