@@ -396,15 +396,28 @@ if not df_dia_fil.empty:
                 lineas.append(f"{salida} → {reingreso} ({minutos} min)")
             return " | ".join(lineas)
 
-        df_sal_agrup = df_interm_filt.groupby(["empleado", "fecha"]).apply(
-            formatear_salidas, include_groups=False
-        ).rename("salidas_intermedias").reset_index()
-        df_sal_agrup["fecha"] = df_sal_agrup["fecha"].astype(str).str[:10]
+        # Construir tabla de salidas intermedias manualmente
+        filas_sal = []
+        for (emp, fec), grupo in df_interm_filt.groupby(["empleado", "fecha"]):
+            lineas = []
+            for _, row in grupo.iterrows():
+                salida    = str(row.get("hora_salida_intermedia", ""))[:5]
+                reingreso = str(row.get("hora_reentrada", ""))[:5]
+                minutos   = row.get("minutos_fuera", "")
+                lineas.append(f"{salida} - {reingreso} ({minutos} min)")
+            filas_sal.append({
+                "empleado": emp,
+                "fecha": str(fec)[:10],
+                "salidas_intermedias": " | ".join(lineas)
+            })
+        df_sal_agrup = pd.DataFrame(filas_sal)
 
-        # Evitar columna duplicada si ya existe
         if "salidas_intermedias" in df_det.columns:
             df_det = df_det.drop(columns=["salidas_intermedias"])
-        df_det = df_det.merge(df_sal_agrup[["empleado", "fecha", "salidas_intermedias"]], on=["empleado", "fecha"], how="left")
+        if not df_sal_agrup.empty:
+            df_det = df_det.merge(df_sal_agrup, on=["empleado", "fecha"], how="left")
+        else:
+            df_det["salidas_intermedias"] = "-"
     else:
         df_det["salidas_intermedias"] = "-"
 
