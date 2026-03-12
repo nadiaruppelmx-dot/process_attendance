@@ -398,14 +398,13 @@ if not df_dia_fil.empty:
 
         df_sal_agrup = df_interm_filt.groupby(["empleado", "fecha"]).apply(
             formatear_salidas, include_groups=False
-        ).reset_index()
-        df_sal_agrup.columns = ["empleado", "fecha", "salidas_intermedias"]
+        ).rename("salidas_intermedias").reset_index()
         df_sal_agrup["fecha"] = df_sal_agrup["fecha"].astype(str).str[:10]
 
         # Evitar columna duplicada si ya existe
         if "salidas_intermedias" in df_det.columns:
             df_det = df_det.drop(columns=["salidas_intermedias"])
-        df_det = df_det.merge(df_sal_agrup, on=["empleado", "fecha"], how="left")
+        df_det = df_det.merge(df_sal_agrup[["empleado", "fecha", "salidas_intermedias"]], on=["empleado", "fecha"], how="left")
     else:
         df_det["salidas_intermedias"] = "-"
 
