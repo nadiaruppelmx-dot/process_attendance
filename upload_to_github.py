@@ -92,13 +92,13 @@ def subir_archivo(token, local_path, path_in_repo):
 
 # ── Main ─────────────────────────────────────────────────────────────────────
 def main():
-    print("\n📤 Subiendo CSVs a GitHub...")
+    print("\n[^] Subiendo CSVs a GitHub...")
     print(f"   Repositorio: {GITHUB_USER}/{REPO_NAME}")
 
     try:
         token = obtener_token()
     except ValueError as e:
-        print(f"\n❌ {e}")
+        print(f"\n[ERROR] {e}")
         return False
 
     exito = True
@@ -107,21 +107,21 @@ def main():
         path_in_repo  = f"data/processed/{archivo}"
 
         if not os.path.exists(local_path):
-            print(f"   ⚠️  No encontrado: {archivo}")
+            print(f"   [!]  No encontrado: {archivo}")
             continue
 
         try:
             status = subir_archivo(token, local_path, path_in_repo)
-            print(f"   ✅ {archivo} → GitHub ({status})")
+            print(f"   [OK] {archivo} -> GitHub ({status})")
         except Exception as e:
-            print(f"   ❌ Error subiendo {archivo}: {e}")
+            print(f"   [ERROR] Error subiendo {archivo}: {e}")
             exito = False
 
     if exito:
-        print(f"\n✅ Todos los archivos subidos correctamente.")
+        print(f"\n[OK] Todos los archivos subidos correctamente.")
         print(f"   URL: https://github.com/{GITHUB_USER}/{REPO_NAME}/tree/{BRANCH}/data/processed")
     else:
-        print(f"\n⚠️  Algunos archivos no se pudieron subir. Revisá el token y la conexión.")
+        print(f"\n[!]  Algunos archivos no se pudieron subir. Revisa el token y la conexion.")
 
     return exito
 

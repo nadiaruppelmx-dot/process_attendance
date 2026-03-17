@@ -425,7 +425,7 @@ def run(files: list, use_sqlite: bool = False):
     all_semanal = []
 
     for fpath in files:
-        print(f"\n📂 Procesando: {fpath}")
+        print(f"\n[>] Procesando: {fpath}")
         df_raw = load_excel(fpath)
         semanas = sorted(df_raw["semana_label"].unique())
         print(f"   Semanas detectadas : {', '.join(semanas)}")
@@ -463,10 +463,10 @@ def run(files: list, use_sqlite: bool = False):
     df_interm.to_csv(out_i, index=False, encoding="utf-8-sig")
     df_semanal.to_csv(out_s, index=False, encoding="utf-8-sig")
 
-    print(f"\n✅ CSVs guardados en '{PROCESSED_DIR}/':")
-    print(f"   → registros_diarios.csv   ({len(df_diario)} filas)")
-    print(f"   → salidas_intermedias.csv ({len(df_interm)} filas)")
-    print(f"   → resumen_semanal.csv     ({len(df_semanal)} filas)")
+    print(f"\n[OK] CSVs guardados en '{PROCESSED_DIR}/':")
+    print(f"   -> registros_diarios.csv   ({len(df_diario)} filas)")
+    print(f"   -> salidas_intermedias.csv ({len(df_interm)} filas)")
+    print(f"   -> resumen_semanal.csv     ({len(df_semanal)} filas)")
 
     # ── Guardar SQLite ───────────────────────────────────────────────────────
     if use_sqlite:
@@ -477,14 +477,14 @@ def run(files: list, use_sqlite: bool = False):
             df_diario.to_sql("registros_diarios",   conn, if_exists="replace", index=False)
             df_interm.to_sql("salidas_intermedias",  conn, if_exists="replace", index=False)
             df_semanal.to_sql("resumen_semanal",     conn, if_exists="replace", index=False)
-        print(f"\n✅ SQLite guardado en '{DB_PATH}'")
+        print(f"\n[OK] SQLite guardado en '{DB_PATH}'")
 
     # ── Vista previa ─────────────────────────────────────────────────────────
-    print("\n─── RESUMEN SEMANAL ─────────────────────────────────────────────")
+    print("\n--- RESUMEN SEMANAL ---------------------------------------------")
     if not df_semanal.empty:
         print(df_semanal.to_string(index=False))
 
-    print("\n─── REGISTROS DIARIOS / TURNOS ──────────────────────────────────")
+    print("\n--- REGISTROS DIARIOS / TURNOS ----------------------------------")
     if not df_diario.empty:
         cols_preview = ["semana", "empleado", "fecha", "fecha_salida",
                         "turno_nocturno", "hora_entrada", "hora_salida", "horas_trabajadas"]
@@ -495,11 +495,11 @@ def run(files: list, use_sqlite: bool = False):
         sin_sal = df_diario[df_diario["sin_salida"] == 1]
         sin_ent = df_diario[df_diario["sin_entrada"] == 1]
         if not sin_sal.empty:
-            print(f"\n⚠️  Turnos SIN salida registrada ({len(sin_sal)}):")
+            print(f"\n[!]  Turnos SIN salida registrada ({len(sin_sal)}):")
             for _, r in sin_sal.iterrows():
                 print(f"   {r['empleado']}  {r['fecha']}  entrada: {r['hora_entrada']}")
         if not sin_ent.empty:
-            print(f"\n⚠️  Turnos SIN entrada registrada ({len(sin_ent)}):")
+            print(f"\n[!]  Turnos SIN entrada registrada ({len(sin_ent)}):")
             for _, r in sin_ent.iterrows():
                 print(f"   {r['empleado']}  {r['fecha']}  salida: {r['hora_salida']}")
 
@@ -535,7 +535,7 @@ if __name__ == "__main__":
     else:
         files = sorted(glob.glob(os.path.join(RAW_DIR, "*.xlsx")))
         if not files:
-            print(f"⚠️  No se encontraron archivos .xlsx en '{RAW_DIR}/'")
+            print(f"[!]  No se encontraron archivos .xlsx en '{RAW_DIR}/'")
             print(f"   Coloca tus archivos semanales en esa carpeta o usa --file")
             exit(1)
 
