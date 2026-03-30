@@ -111,14 +111,20 @@ def obtener_categoria(nombre):
     return "Sin categoria"
 
 def obtener_categoria_forzado(nombre):
-    """Busca categoria eliminando todos los caracteres no ASCII antes de comparar."""
+    """Busca categoria convirtiendo caracteres Latin-1 a ASCII antes de comparar."""
     import re
-    # Eliminar todo lo que no sea letra, numero o espacio
-    nombre_limpio = re.sub(r'[^A-Za-z0-9 ]', '', nombre.upper()).strip()
-    nombre_limpio = re.sub(r' +', ' ', nombre_limpio)
+    # Tabla de conversion de caracteres Latin-1 a ASCII
+    tabla = str.maketrans(
+        'ÁÉÍÓÚáéíóúÀÈÌÒÙàèìòùÄËÏÖÜäëïöüÂÊÎÔÛâêîôûÑñÇç',
+        'AEIOUaeiouAEIOUaeiouAEIOUaeiouAEIOUaeiouNnCc'
+    )
+    nombre_limpio = nombre.upper().translate(tabla).strip()
+    nombre_limpio = re.sub(r'[^A-Za-z0-9 ]', '', nombre_limpio)
+    nombre_limpio = re.sub(r' +', ' ', nombre_limpio).strip()
     for key, cat in CATEGORIAS_EMPLEADOS.items():
-        key_limpio = re.sub(r'[^A-Za-z0-9 ]', '', key).strip()
-        key_limpio = re.sub(r' +', ' ', key_limpio)
+        key_limpio = key.upper().translate(tabla).strip()
+        key_limpio = re.sub(r'[^A-Za-z0-9 ]', '', key_limpio)
+        key_limpio = re.sub(r' +', ' ', key_limpio).strip()
         if key_limpio == nombre_limpio or key_limpio in nombre_limpio or nombre_limpio in key_limpio:
             return cat
     return "Sin categoria"
