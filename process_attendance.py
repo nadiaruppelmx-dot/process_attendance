@@ -81,16 +81,21 @@ CATEGORIAS_EMPLEADOS = {
 NOMBRES_IGNORAR = {"HACIENDA PAZ"}
 
 def normalizar_nombre(nombre):
-    """Normaliza un nombre para buscar en el diccionario de categorías."""
+    """Normaliza un nombre eliminando acentos y espacios multiples."""
     import unicodedata, re
-    nombre = nombre.upper().strip()
+    nombre = str(nombre).upper().strip()
+    # Intentar decodificar si viene en Latin-1
+    try:
+        nombre = nombre.encode('latin-1').decode('utf-8')
+    except Exception:
+        pass
     # Eliminar acentos
     nombre = ''.join(
         c for c in unicodedata.normalize('NFD', nombre)
         if unicodedata.category(c) != 'Mn'
     )
-    # Colapsar espacios multiples en uno solo
-    nombre = re.sub(r' +', ' ', nombre)
+    # Colapsar espacios multiples
+    nombre = re.sub(r'\s+', ' ', nombre).strip()
     return nombre
 
 def obtener_categoria(nombre):
