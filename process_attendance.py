@@ -54,8 +54,8 @@ DEDUP_WINDOW_SECONDS = 60
 # sin ningún registro intermedio.
 MAX_GAP_TURNO_HORAS = 8
 
-# Umbral de turno para guardias (pueden hacer 24hs o más consecutivas)
-MAX_GAP_GUARDIA_HORAS = 36
+# Umbral de turno para guardias — valor alto para no partir turnos largos
+MAX_GAP_GUARDIA_HORAS = 200
 
 # Categorías de empleados — agregar nuevos empleados aquí
 CATEGORIAS_EMPLEADOS = {
@@ -433,8 +433,15 @@ def procesar_semana(df: pd.DataFrame):
             else:
                 mins_brutos = np.nan
 
-            # Salidas intermedias y tiempo fuera
-            sal_inter, mins_fuera = calcular_horas_fuera(turno)
+            # Categoria del empleado
+            cat_emp = obtener_categoria(emp)
+
+            # Salidas intermedias — solo para no guardias
+            if cat_emp == "Guardia":
+                sal_inter  = []
+                mins_fuera = 0
+            else:
+                sal_inter, mins_fuera = calcular_horas_fuera(turno)
 
             # Horas netas
             if not np.isnan(mins_brutos):
@@ -444,8 +451,7 @@ def procesar_semana(df: pd.DataFrame):
                 horas_trabajadas = np.nan
                 horas_fuera      = np.nan
 
-            # Calcular turnos de guardia (cada 24hs)
-            cat_emp = obtener_categoria(emp)
+            # Turnos de guardia (horas totales / 24)
             if cat_emp == "Guardia" and not np.isnan(horas_trabajadas):
                 turnos_guardia = round(horas_trabajadas / 24, 2)
             else:
