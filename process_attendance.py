@@ -77,6 +77,9 @@ CATEGORIAS_EMPLEADOS = {
     "DANIEL SANCHEZ LOPEZ":                "Externo",
 }
 
+# Registros a ignorar (no son empleados)
+NOMBRES_IGNORAR = {"HACIENDA PAZ"}
+
 def normalizar_nombre(nombre):
     """Normaliza un nombre para buscar en el diccionario de categorías."""
     import unicodedata, re
