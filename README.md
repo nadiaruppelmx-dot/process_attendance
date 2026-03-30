@@ -222,3 +222,61 @@ El sistema QR puede generar registros duplicados (múltiples lecturas en segundo
 **Días sin salida registrada** (`sin_salida = 1`): el empleado tiene entrada pero no salida. Las horas de ese día aparecen como vacías. Recomendación: revisar si el sistema QR falló o si el empleado olvidó registrar la salida.
 
 **Días sin entrada registrada** (`sin_entrada = 1`): caso inverso. Puede indicar que entró el día anterior tarde (turno nocturno) y registró su salida al día siguiente.
+
+---
+
+## 9. Troubleshooting — Problemas conocidos y soluciones
+
+### Empleados que aparecen como "Sin categoria"
+
+**Causa:** Los nombres en el Excel vienen codificados en Latin-1 en lugar de UTF-8. Los caracteres con acento (Á, É, Í, Ó, Ú, Ñ) tienen valores de byte distintos en cada codificación. Al intentar normalizarlos con métodos estándar, los caracteres se eliminan en lugar de convertirse, dejando nombres como `HERNNDEZ` en vez de `HERNANDEZ`.
+
+**Solución implementada:** El script usa una tabla de conversión explícita de caracteres Latin-1 a ASCII en la función `obtener_categoria_forzado()`, que se aplica como paso de corrección después del procesamiento principal. Esta función convierte `Á→A`, `É→E`, `Í→I`, `Ó→O`, `Ú→U`, `Ñ→N` antes de comparar con el diccionario de categorías.
+
+**Si aparece un empleado nuevo como "Sin categoria":**
+1. Corré este comando para ver el nombre exacto normalizado:
+```powershell
+python -c "import pandas as pd, re; df = pd.read_csv('data/processed/registros_diarios.csv', encoding='utf-8-sig'); [print(repr(re.sub(r' +', ' ', re.sub(r'[^A-Za-z0-9 ]', '', n.upper().translate(str.maketrans('ÁÉÍÓÚáéíóúÑñ','AEIOUaeiouNn')))))) for n in df[df['categoria']=='Sin categoria']['empleado'].unique()]"
+```
+2. Agregá el nombre resultante al diccionario `CATEGORIAS_EMPLEADOS` en `process_attendance.py`
+3. Volvé a correr el bat
+
+---
+
+### Error UnicodeEncodeError en la terminal de Windows
+
+**Causa:** Windows usa codificación cp1252 por defecto en la terminal, que no soporta caracteres especiales como flechas (→), líneas (─) o emojis.
+
+**Solución implementada:** El archivo `procesar_semana.bat` incluye `chcp 65001` al inicio para activar UTF-8 en Windows. Todos los mensajes del script usan solo caracteres ASCII (`[OK]`, `[ERROR]`, `[!]`, `->`).
+
+**Si vuelve a aparecer este error:** Verificar que `procesar_semana.bat` tenga `chcp 65001` en la primera línea ejecutable.
+
+---
+
+### Los CSVs no se actualizan en la app después de correr el bat
+
+**Causas posibles y soluciones:**
+
+1. **El Excel estaba abierto** al correr el bat → cerrarlo y volver a correr
+2. **El token de GitHub venció o es incorrecto** → verificar en GitHub Settings → Developer settings → Personal access tokens
+3. **El archivo `.github_token` tiene extensión `.txt` oculta** → renombrarlo con `Rename-Item ".github_token.txt" ".github_token"` en PowerShell
+4. **Cache de Streamlit Cloud** → hacer clic en "Refrescar datos" en el sidebar de la app
+5. **El bat no encontró Python** → correr `python upload_to_github.py` manualmente para ver el error
+
+---
+
+### El Excel de entrada tiene columnas en orden o nombres distintos
+
+**Causa:** La persona que genera el Excel a veces lo filtra o edita antes de enviarlo, cambiando el orden o nombre de las columnas.
+
+**Solución:** El script detecta las columnas por palabras clave (`qr`, `tipo`, `nombre`, `fecha`, `hora`) sin importar el orden. Si las columnas tienen nombres completamente distintos, actualizar el mapeo en la función `load_excel()` en `process_attendance.py`.
+
+**Recomendación:** Pedir que el Excel de entrada no sea editado ni filtrado antes de enviarse.
+
+---
+
+### Fechas y horas con formato numérico (número de serie de Excel)
+
+**Causa:** Al copiar datos entre Excels o aplicar fórmulas para separar fecha y hora, Excel puede guardar los valores como números de serie (ej: `46083`) en lugar de texto legible.
+
+**Solución implementada:** Las funciones `normalizar_fecha()` y `normalizar_hora()` en `load_excel()` detectan automáticamente si el valor es un número de serie de Excel y lo convierten al formato correcto. No requiere intervención manual.
