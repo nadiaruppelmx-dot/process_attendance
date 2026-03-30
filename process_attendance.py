@@ -54,87 +54,6 @@ DEDUP_WINDOW_SECONDS = 60
 # sin ningún registro intermedio.
 MAX_GAP_TURNO_HORAS = 8
 
-# Umbral de turno para guardias — valor alto para no partir turnos largos
-MAX_GAP_GUARDIA_HORAS = 200
-
-# Categorías de empleados — agregar nuevos empleados aquí
-CATEGORIAS_EMPLEADOS = {
-    # Administrador
-    "XAVIER GONZALEZ ANGULO":              "Administrador",
-    # Guardias
-    "CARLOS CONTRERAS":                    "Guardia",
-    "CHRISTIAN CORTES":                    "Guardia",
-    "NOE CONTRERAS GARCIA":                "Guardia",
-    "JOSE MANUEL NOLASCO SORIANO":         "Guardia",
-    # De planta
-    "ALEXIS SERRANO":                      "De planta",
-    "JUAN GARCIA":                         "De planta",
-    "IRVING GARCIA":                       "De planta",
-    "JACOBO JUAREZ CORDOBA":               "De planta",
-    "MARIA FERNANDA NUNEZ HERNANDEZ":      "De planta",
-    "CATALINA GLORIA HERNANDEZ  SUAREZ":   "De planta",
-    # Externos
-    "DANIEL SANCHEZ LOPEZ":                "Externo",
-}
-
-# Registros a ignorar (no son empleados)
-NOMBRES_IGNORAR = {"HACIENDA PAZ"}
-
-def normalizar_nombre(nombre):
-    """Normaliza un nombre eliminando acentos y espacios multiples."""
-    import unicodedata, re
-    nombre = str(nombre).upper().strip()
-    # Intentar decodificar si viene en Latin-1
-    try:
-        nombre = nombre.encode('latin-1').decode('utf-8')
-    except Exception:
-        pass
-    # Eliminar acentos
-    nombre = ''.join(
-        c for c in unicodedata.normalize('NFD', nombre)
-        if unicodedata.category(c) != 'Mn'
-    )
-    # Colapsar espacios multiples
-    nombre = re.sub(r'\s+', ' ', nombre).strip()
-    return nombre
-
-def obtener_categoria(nombre):
-    """Retorna la categoría del empleado o 'Sin categoría' si no está en el diccionario."""
-    nombre_norm = normalizar_nombre(nombre)
-    # Buscar coincidencia exacta
-    if nombre_norm in CATEGORIAS_EMPLEADOS:
-        return CATEGORIAS_EMPLEADOS[nombre_norm]
-    # Buscar coincidencia parcial
-    for key, cat in CATEGORIAS_EMPLEADOS.items():
-        if key in nombre_norm or nombre_norm in key:
-            return cat
-    return "Sin categoria"
-
-def obtener_categoria_forzado(nombre):
-    """Busca categoria convirtiendo caracteres Latin-1 a ASCII antes de comparar."""
-    import re
-    # Tabla de conversion de caracteres Latin-1 a ASCII
-    tabla = str.maketrans(
-        'ÁÉÍÓÚáéíóúÀÈÌÒÙàèìòùÄËÏÖÜäëïöüÂÊÎÔÛâêîôûÑñÇç',
-        'AEIOUaeiouAEIOUaeiouAEIOUaeiouAEIOUaeiouNnCc'
-    )
-    nombre_limpio = nombre.upper().translate(tabla).strip()
-    nombre_limpio = re.sub(r'[^A-Za-z0-9 ]', '', nombre_limpio)
-    nombre_limpio = re.sub(r' +', ' ', nombre_limpio).strip()
-    for key, cat in CATEGORIAS_EMPLEADOS.items():
-        key_limpio = key.upper().translate(tabla).strip()
-        key_limpio = re.sub(r'[^A-Za-z0-9 ]', '', key_limpio)
-        key_limpio = re.sub(r' +', ' ', key_limpio).strip()
-        if key_limpio == nombre_limpio or key_limpio in nombre_limpio or nombre_limpio in key_limpio:
-            return cat
-    return "Sin categoria"
-
-def get_gap_horas(nombre):
-    """Retorna el umbral de turno según la categoría del empleado."""
-    if obtener_categoria(nombre) == "Guardia":
-        return MAX_GAP_GUARDIA_HORAS
-    return MAX_GAP_TURNO_HORAS
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # UTILIDADES
@@ -178,7 +97,7 @@ def deduplicate_events(df_emp: pd.DataFrame, window_sec: int = 60) -> pd.DataFra
     return pd.DataFrame(rows_to_keep).reset_index(drop=True)
 
 
-def detectar_turnos(df_emp_dedup: pd.DataFrame, max_gap_horas: float = MAX_GAP_TURNO_HORAS) -> list:
+def detectar_turnos(df_emp_dedup: pd.DataFrame) -> list:
     """
     Agrupa los eventos deduplicados de un empleado en turnos.
 
@@ -219,7 +138,7 @@ def detectar_turnos(df_emp_dedup: pd.DataFrame, max_gap_horas: float = MAX_GAP_T
         #   Entrada → Entrada (brecha larga): TURNO NUEVO  (día sin salida registrada) ✓
         #   Salida  → Salida  (brecha larga): TURNO NUEVO  (día sin entrada registrada) ✓
         es_trabajando = (not prev["es_salida"]) and curr["es_salida"]  # E→S: mismo turno
-        if not es_trabajando and gap_h > max_gap_horas:
+        if not es_trabajando and gap_h > MAX_GAP_TURNO_HORAS:
             turnos.append(df.iloc[inicio:i].copy())
             inicio = i
 
@@ -385,17 +304,13 @@ def procesar_semana(df: pd.DataFrame):
     salidas_interm_rows = []
 
     for emp in sorted(df["nombre"].unique()):
-        # Ignorar registros que no son empleados
-        if normalizar_nombre(emp) in {normalizar_nombre(n) for n in NOMBRES_IGNORAR}:
-            continue
         df_emp = df[df["nombre"] == emp].copy()
 
         # Deduplicar sobre el dataset completo del empleado en la semana
         df_emp_dedup = deduplicate_events(df_emp, DEDUP_WINDOW_SECONDS)
 
-        # Detectar turnos con umbral según categoría del empleado
-        gap_emp = get_gap_horas(emp)
-        turnos = detectar_turnos(df_emp_dedup, gap_emp)
+        # Detectar turnos (agrupa eventos con brecha < MAX_GAP_TURNO_HORAS)
+        turnos = detectar_turnos(df_emp_dedup)
 
         for turno_idx, turno in enumerate(turnos):
             entradas = turno[~turno["es_salida"]]
@@ -433,15 +348,8 @@ def procesar_semana(df: pd.DataFrame):
             else:
                 mins_brutos = np.nan
 
-            # Categoria del empleado
-            cat_emp = obtener_categoria(emp)
-
-            # Salidas intermedias — solo para no guardias
-            if cat_emp == "Guardia":
-                sal_inter  = []
-                mins_fuera = 0
-            else:
-                sal_inter, mins_fuera = calcular_horas_fuera(turno)
+            # Salidas intermedias y tiempo fuera
+            sal_inter, mins_fuera = calcular_horas_fuera(turno)
 
             # Horas netas
             if not np.isnan(mins_brutos):
@@ -451,16 +359,9 @@ def procesar_semana(df: pd.DataFrame):
                 horas_trabajadas = np.nan
                 horas_fuera      = np.nan
 
-            # Turnos de guardia (horas totales / 24)
-            if cat_emp == "Guardia" and not np.isnan(horas_trabajadas):
-                turnos_guardia = round(horas_trabajadas / 24, 2)
-            else:
-                turnos_guardia = None
-
             registros_diarios.append({
                 "semana":           sem_turno,
                 "empleado":         emp,
-                "categoria":        cat_emp,
                 "fecha":            fecha_turno,
                 "fecha_salida":     fecha_salida if turno_nocturno else None,
                 "turno_nocturno":   int(turno_nocturno),
@@ -471,7 +372,6 @@ def procesar_semana(df: pd.DataFrame):
                 "n_salidas_interm": len(sal_inter),
                 "sin_salida":       int(salidas.empty),
                 "sin_entrada":      int(entradas.empty),
-                "turnos_guardia":   turnos_guardia,
             })
 
             # Salidas intermedias detalladas
@@ -493,8 +393,6 @@ def procesar_semana(df: pd.DataFrame):
 
     # ── Resumen semanal ──────────────────────────────────────────────────────
     if not df_diario.empty:
-        # Incluir categoria en el resumen
-        cat_map = df_diario.groupby("empleado")["categoria"].first()
         df_sem = df_diario.groupby(["semana", "empleado"]).agg(
             turnos_registrados  = ("fecha",             "count"),
             turnos_con_entrada  = ("sin_entrada",        lambda x: int((x == 0).sum())),
@@ -504,9 +402,7 @@ def procesar_semana(df: pd.DataFrame):
             promedio_horas_turno= ("horas_trabajadas",   "mean"),
             total_horas_fuera   = ("horas_fuera",        "sum"),
             total_salidas_interm= ("n_salidas_interm",   "sum"),
-            total_turnos_guardia= ("turnos_guardia",     "sum"),
         ).reset_index()
-        df_sem["categoria"] = df_sem["empleado"].map(cat_map)
 
         df_sem["total_horas"]          = df_sem["total_horas"].round(2)
         df_sem["promedio_horas_turno"] = df_sem["promedio_horas_turno"].round(2)
@@ -563,24 +459,14 @@ def run(files: list, use_sqlite: bool = False):
     out_i = os.path.join(PROCESSED_DIR, "salidas_intermedias.csv")
     out_s = os.path.join(PROCESSED_DIR, "resumen_semanal.csv")
 
-    # Corregir categorias post-procesamiento (por si la normalización falló)
-    if "categoria" in df_diario.columns:
-        def corregir_categoria(row):
-            if row["categoria"] == "Sin categoria":
-                return obtener_categoria_forzado(row["empleado"])
-            return row["categoria"]
-        df_diario["categoria"]  = df_diario.apply(corregir_categoria, axis=1)
-    if "categoria" in df_semanal.columns:
-        df_semanal["categoria"] = df_semanal["empleado"].apply(obtener_categoria_forzado)
-
     df_diario.to_csv(out_d, index=False, encoding="utf-8-sig")
     df_interm.to_csv(out_i, index=False, encoding="utf-8-sig")
     df_semanal.to_csv(out_s, index=False, encoding="utf-8-sig")
 
     print(f"\n[OK] CSVs guardados en '{PROCESSED_DIR}/':")
-    print(f"   -> registros_diarios.csv   ({len(df_diario)} filas)")
-    print(f"   -> salidas_intermedias.csv ({len(df_interm)} filas)")
-    print(f"   -> resumen_semanal.csv     ({len(df_semanal)} filas)")
+    print(f"   → registros_diarios.csv   ({len(df_diario)} filas)")
+    print(f"   → salidas_intermedias.csv ({len(df_interm)} filas)")
+    print(f"   → resumen_semanal.csv     ({len(df_semanal)} filas)")
 
     # ── Guardar SQLite ───────────────────────────────────────────────────────
     if use_sqlite:
@@ -594,11 +480,11 @@ def run(files: list, use_sqlite: bool = False):
         print(f"\n[OK] SQLite guardado en '{DB_PATH}'")
 
     # ── Vista previa ─────────────────────────────────────────────────────────
-    print("\n--- RESUMEN SEMANAL ---------------------------------------------")
+    print("\n─── RESUMEN SEMANAL ─────────────────────────────────────────────")
     if not df_semanal.empty:
         print(df_semanal.to_string(index=False))
 
-    print("\n--- REGISTROS DIARIOS / TURNOS ----------------------------------")
+    print("\n─── REGISTROS DIARIOS / TURNOS ──────────────────────────────────")
     if not df_diario.empty:
         cols_preview = ["semana", "empleado", "fecha", "fecha_salida",
                         "turno_nocturno", "hora_entrada", "hora_salida", "horas_trabajadas"]
