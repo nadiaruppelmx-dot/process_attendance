@@ -358,6 +358,9 @@ def procesar_semana(df: pd.DataFrame):
     salidas_interm_rows = []
 
     for emp in sorted(df["nombre"].unique()):
+        # Ignorar registros que no son empleados
+        if normalizar_nombre(emp) in {normalizar_nombre(n) for n in NOMBRES_IGNORAR}:
+            continue
         df_emp = df[df["nombre"] == emp].copy()
 
         # Deduplicar sobre el dataset completo del empleado en la semana
