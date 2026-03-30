@@ -110,6 +110,19 @@ def obtener_categoria(nombre):
             return cat
     return "Sin categoria"
 
+def obtener_categoria_forzado(nombre):
+    """Busca categoria eliminando todos los caracteres no ASCII antes de comparar."""
+    import re
+    # Eliminar todo lo que no sea letra, numero o espacio
+    nombre_limpio = re.sub(r'[^A-Za-z0-9 ]', '', nombre.upper()).strip()
+    nombre_limpio = re.sub(r' +', ' ', nombre_limpio)
+    for key, cat in CATEGORIAS_EMPLEADOS.items():
+        key_limpio = re.sub(r'[^A-Za-z0-9 ]', '', key).strip()
+        key_limpio = re.sub(r' +', ' ', key_limpio)
+        if key_limpio == nombre_limpio or key_limpio in nombre_limpio or nombre_limpio in key_limpio:
+            return cat
+    return "Sin categoria"
+
 def get_gap_horas(nombre):
     """Retorna el umbral de turno según la categoría del empleado."""
     if obtener_categoria(nombre) == "Guardia":
@@ -537,6 +550,16 @@ def run(files: list, use_sqlite: bool = False):
     out_d = os.path.join(PROCESSED_DIR, "registros_diarios.csv")
     out_i = os.path.join(PROCESSED_DIR, "salidas_intermedias.csv")
     out_s = os.path.join(PROCESSED_DIR, "resumen_semanal.csv")
+
+    # Corregir categorias post-procesamiento (por si la normalización falló)
+    if "categoria" in df_diario.columns:
+        def corregir_categoria(row):
+            if row["categoria"] == "Sin categoria":
+                return obtener_categoria_forzado(row["empleado"])
+            return row["categoria"]
+        df_diario["categoria"]  = df_diario.apply(corregir_categoria, axis=1)
+    if "categoria" in df_semanal.columns:
+        df_semanal["categoria"] = df_semanal["empleado"].apply(obtener_categoria_forzado)
 
     df_diario.to_csv(out_d, index=False, encoding="utf-8-sig")
     df_interm.to_csv(out_i, index=False, encoding="utf-8-sig")
