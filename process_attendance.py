@@ -72,20 +72,22 @@ CATEGORIAS_EMPLEADOS = {
     "IRVING GARCIA":                       "De planta",
     "JACOBO JUAREZ CORDOBA":               "De planta",
     "MARIA FERNANDA NUNEZ HERNANDEZ":      "De planta",
-    "CATALINA GLORIA HERNANDEZ SUAREZ":    "De planta",
+    "CATALINA GLORIA HERNANDEZ  SUAREZ":   "De planta",
     # Externos
     "DANIEL SANCHEZ LOPEZ":                "Externo",
 }
 
 def normalizar_nombre(nombre):
     """Normaliza un nombre para buscar en el diccionario de categorías."""
-    import unicodedata
+    import unicodedata, re
     nombre = nombre.upper().strip()
     # Eliminar acentos
     nombre = ''.join(
         c for c in unicodedata.normalize('NFD', nombre)
         if unicodedata.category(c) != 'Mn'
     )
+    # Colapsar espacios multiples en uno solo
+    nombre = re.sub(r' +', ' ', nombre)
     return nombre
 
 def obtener_categoria(nombre):
