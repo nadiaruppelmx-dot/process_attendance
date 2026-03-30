@@ -188,16 +188,33 @@ with st.sidebar:
 
     semanas = sorted(df_semanal["semana"].unique(), reverse=True)
     semana_sel = st.multiselect(
-        "📅 Semanas",
+        "Semanas",
         options=semanas,
         default=[semanas[0]] if semanas else [],
     )
     if not semana_sel:
         semana_sel = [semanas[0]] if semanas else []
 
-    empleados = sorted(df_semanal[df_semanal["semana"].isin(semana_sel)]["empleado"].unique())
+    # Filtro por categoria
+    cats_disponibles = []
+    if "categoria" in df_semanal.columns:
+        cats_disponibles = sorted(df_semanal[df_semanal["semana"].isin(semana_sel)]["categoria"].dropna().unique())
+    cat_sel = st.multiselect(
+        "Categoria",
+        options=cats_disponibles,
+        default=[],
+        placeholder="Todas"
+    )
+    if not cat_sel:
+        cat_sel = cats_disponibles
+
+    # Filtro por empleado — restringido por semana y categoria
+    df_emp_filtrado = df_semanal[df_semanal["semana"].isin(semana_sel)]
+    if "categoria" in df_emp_filtrado.columns and cat_sel:
+        df_emp_filtrado = df_emp_filtrado[df_emp_filtrado["categoria"].isin(cat_sel)]
+    empleados = sorted(df_emp_filtrado["empleado"].unique())
     emp_sel = st.multiselect(
-        "👤 Empleados",
+        "Empleados",
         options=empleados,
         default=[],
         placeholder="Todos"
@@ -230,7 +247,8 @@ df_alertas = df_diario[
 
 # ── Título ───────────────────────────────────────────────────────────────────
 st.markdown(f"# Reporte de Asistencia")
-st.markdown(f"<span style='color:#8b8fa8;font-size:0.9rem'>Semanas: {', '.join(str(s) for s in semana_sel)} · {len(emp_sel)} empleado(s)</span>",
+cat_label = ', '.join(cat_sel) if cat_sel != cats_disponibles else 'Todas'
+st.markdown(f"<span style='color:#8b8fa8;font-size:0.9rem'>Semanas: {', '.join(str(s) for s in semana_sel)} · {cat_label} · {len(emp_sel)} empleado(s)</span>",
             unsafe_allow_html=True)
 st.markdown("---")
 
@@ -376,8 +394,12 @@ if not df_dia_fil.empty:
     df_dia_fil["horas_fuera"]      = pd.to_numeric(df_dia_fil["horas_fuera"], errors="coerce")
 
     # Armar tabla base
-    df_det = df_dia_fil[["empleado", "fecha", "hora_entrada", "hora_salida",
-                          "horas_trabajadas", "horas_fuera"]].copy()
+    cols_det = ["empleado", "categoria", "fecha", "hora_entrada", "hora_salida",
+                "horas_trabajadas", "horas_fuera"]
+    # Agregar turnos_guardia si existe
+    if "turnos_guardia" in df_dia_fil.columns:
+        cols_det.append("turnos_guardia")
+    df_det = df_dia_fil[[c for c in cols_det if c in df_dia_fil.columns]].copy()
     df_det["fecha"] = df_det["fecha"].astype(str).str[:10]
     df_det["jornada_in_situ"] = (df_det["horas_trabajadas"] - df_det["horas_fuera"].fillna(0)).round(2)
 
@@ -483,6 +505,7 @@ st.markdown('<p class="section-title">Resumen semanal por empleado</p>', unsafe_
 if not df_sem_fil.empty:
     cols_mostrar = {
         "empleado":            "Empleado",
+        "categoria":           "Categoria",
         "turnos_registrados":  "Turnos",
         "total_horas":         "Horas totales",
         "promedio_horas_turno":"Promedio/turno",
