@@ -195,7 +195,25 @@ with st.sidebar:
     if not semana_sel:
         semana_sel = [semanas[0]] if semanas else []
 
-    empleados = sorted(df_semanal[df_semanal["semana"].isin(semana_sel)]["empleado"].unique())
+    # Filtro por categoría
+    df_semana_filtrada = df_semanal[df_semanal["semana"].isin(semana_sel)]
+    if "categoria" in df_semana_filtrada.columns:
+        categorias_disp = sorted(df_semana_filtrada["categoria"].dropna().unique())
+        cat_sel = st.multiselect(
+            "🏷️ Categoría",
+            options=categorias_disp,
+            default=[],
+            placeholder="Todas"
+        )
+        if not cat_sel:
+            cat_sel = categorias_disp
+        empleados = sorted(
+            df_semana_filtrada[df_semana_filtrada["categoria"].isin(cat_sel)]["empleado"].unique()
+        )
+    else:
+        cat_sel = []
+        empleados = sorted(df_semana_filtrada["empleado"].unique())
+
     emp_sel = st.multiselect(
         "👤 Empleados",
         options=empleados,
