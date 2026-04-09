@@ -91,8 +91,11 @@ _CATEGORIA_LOOKUP = {
 }
 
 def get_categoria(nombre: str):
-    """Retorna la categoría del empleado, o None si no está en la lista (se ignora)."""
-    return _CATEGORIA_LOOKUP.get(nombre.strip().upper(), None)
+    """Retorna la categoría del empleado, o None si no está en la lista (se ignora).
+    Normaliza espacios múltiples internos para tolerar errores de carga en el sistema."""
+    import re
+    nombre_norm = re.sub(r' +', ' ', nombre.strip().upper())
+    return _CATEGORIA_LOOKUP.get(nombre_norm, None)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
