@@ -54,6 +54,46 @@ DEDUP_WINDOW_SECONDS = 60
 # sin ningún registro intermedio.
 MAX_GAP_TURNO_HORAS = 8
 
+# ──────────────────────────────────────────────────────────────────────────────
+# CATEGORÍAS DE EMPLEADOS
+# Agrega o edita nombres aquí cuando cambie el personal.
+# Los nombres deben coincidir exactamente con los del Excel (en MAYÚSCULAS).
+# Los empleados no listados quedarán como "Sin categoría".
+# ──────────────────────────────────────────────────────────────────────────────
+CATEGORIAS_EMPLEADOS = {
+    "Administrador": [
+        "XAVIER GONZALEZ ANGULO",
+    ],
+    "Guardia": [
+        "CARLOS CONTRERAS",
+        "CHRISTIAN CORTÉS",
+        "NOE CONTRERAS GARCIA",
+        "JOSE MANUEL NOLASCO SORIANO",
+    ],
+    "De planta": [
+        "ALEXIS SERRANO",
+        "JUAN GARCIA",
+        "IRVING GARCÍA",
+        "JACOBO JUAREZ CORDOBA",
+        "MARÍA FERNANDA NÚÑEZ HERNANDEZ",
+        "CATALINA GLORIA HERNÁNDEZ SUÁREZ",
+    ],
+    "Externo": [
+        "DANIEL SÁNCHEZ LÓPEZ",
+    ],
+}
+
+# Construir lookup inverso: nombre → categoría
+_CATEGORIA_LOOKUP = {
+    nombre: cat
+    for cat, nombres in CATEGORIAS_EMPLEADOS.items()
+    for nombre in nombres
+}
+
+def get_categoria(nombre: str):
+    """Retorna la categoría del empleado, o None si no está en la lista (se ignora)."""
+    return _CATEGORIA_LOOKUP.get(nombre.strip().upper(), None)
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # UTILIDADES
@@ -304,6 +344,8 @@ def procesar_semana(df: pd.DataFrame):
     salidas_interm_rows = []
 
     for emp in sorted(df["nombre"].unique()):
+        if get_categoria(emp) is None:
+            continue  # Empleado no reconocido, se ignora
         df_emp = df[df["nombre"] == emp].copy()
 
         # Deduplicar sobre el dataset completo del empleado en la semana
@@ -362,6 +404,7 @@ def procesar_semana(df: pd.DataFrame):
             registros_diarios.append({
                 "semana":           sem_turno,
                 "empleado":         emp,
+                "categoria":        get_categoria(emp),
                 "fecha":            fecha_turno,
                 "fecha_salida":     fecha_salida if turno_nocturno else None,
                 "turno_nocturno":   int(turno_nocturno),
@@ -379,6 +422,7 @@ def procesar_semana(df: pd.DataFrame):
                 salidas_interm_rows.append({
                     "semana":                 sem_turno,
                     "empleado":               emp,
+                    "categoria":              get_categoria(emp),
                     "fecha":                  fecha_turno,
                     "hora_salida_intermedia": si["hora_salida_intermedia"].strftime("%H:%M:%S"),
                     "hora_reentrada":         si["hora_reentrada"].strftime("%H:%M:%S"),
@@ -387,13 +431,13 @@ def procesar_semana(df: pd.DataFrame):
 
     df_diario = pd.DataFrame(registros_diarios)
     df_interm  = pd.DataFrame(salidas_interm_rows) if salidas_interm_rows else pd.DataFrame(
-        columns=["semana", "empleado", "fecha", "hora_salida_intermedia",
+        columns=["semana", "empleado", "categoria", "fecha", "hora_salida_intermedia",
                  "hora_reentrada", "minutos_fuera"]
     )
 
     # ── Resumen semanal ──────────────────────────────────────────────────────
     if not df_diario.empty:
-        df_sem = df_diario.groupby(["semana", "empleado"]).agg(
+        df_sem = df_diario.groupby(["semana", "empleado", "categoria"]).agg(
             turnos_registrados  = ("fecha",             "count"),
             turnos_con_entrada  = ("sin_entrada",        lambda x: int((x == 0).sum())),
             turnos_con_salida   = ("sin_salida",         lambda x: int((x == 0).sum())),
@@ -452,7 +496,7 @@ def run(files: list, use_sqlite: bool = False):
             subset=["semana", "empleado", "fecha", "hora_salida_intermedia"]
         )
     if not df_semanal.empty:
-        df_semanal = df_semanal.drop_duplicates(subset=["semana", "empleado"])
+        df_semanal = df_semanal.drop_duplicates(subset=["semana", "empleado", "categoria"])
 
     # ── Guardar CSV ──────────────────────────────────────────────────────────
     out_d = os.path.join(PROCESSED_DIR, "registros_diarios.csv")
